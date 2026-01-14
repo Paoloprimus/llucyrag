@@ -5,32 +5,11 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        get(name: string) {
-          if (typeof document === 'undefined') return ''
-          const value = document.cookie
-            .split('; ')
-            .find((row) => row.startsWith(`${name}=`))
-            ?.split('=')[1]
-          return value ?? ''
-        },
-        set(name: string, value: string, options: { path?: string; maxAge?: number; domain?: string; secure?: boolean }) {
-          if (typeof document === 'undefined') return
-          let cookie = `${name}=${value}`
-          if (options.path) cookie += `; path=${options.path}`
-          if (options.maxAge) cookie += `; max-age=${options.maxAge}`
-          if (options.domain) cookie += `; domain=${options.domain}`
-          if (options.secure) cookie += '; secure'
-          cookie += '; samesite=lax'
-          document.cookie = cookie
-        },
-        remove(name: string, options: { path?: string; domain?: string }) {
-          if (typeof document === 'undefined') return
-          let cookie = `${name}=; max-age=0`
-          if (options.path) cookie += `; path=${options.path}`
-          if (options.domain) cookie += `; domain=${options.domain}`
-          document.cookie = cookie
-        },
+      auth: {
+        flowType: 'implicit', // Use implicit flow for magic links (no PKCE)
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
       },
     }
   )
