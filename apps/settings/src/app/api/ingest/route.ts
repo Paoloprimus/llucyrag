@@ -195,7 +195,7 @@ export async function DELETE(request: NextRequest) {
       query = query.eq('source', source)
     }
 
-    const { error, count } = await query.select('count')
+    const { error } = await query
 
     if (error) {
       console.error('[ingest] Delete error:', error)
