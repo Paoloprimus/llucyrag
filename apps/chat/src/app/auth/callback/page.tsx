@@ -31,6 +31,8 @@ export default function AuthCallbackPage() {
           return
         }
         
+        // Clear hash from URL
+        window.history.replaceState(null, '', window.location.pathname)
         router.push('/')
         return
       }
@@ -62,7 +64,13 @@ export default function AuthCallbackPage() {
         return
       }
       
-      // No auth params found
+      // No auth params found - try to get existing session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.push('/')
+        return
+      }
+      
       setStatus('error')
       setErrorMsg('Nessun parametro di autenticazione trovato')
     }
