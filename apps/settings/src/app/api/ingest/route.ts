@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Import dinamico per debug
-let ingestUserChats: typeof import('@llucy/rag').ingestUserChats
-
 // Test: verifica che la route sia raggiungibile
 export async function GET() {
   return NextResponse.json({ status: 'ok', method: 'GET' })
@@ -12,21 +9,22 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   console.log('[ingest] POST ricevuto')
   
-  // Test semplice per verificare che POST funzioni
-  let body
   try {
-    body = await request.json()
-    console.log('[ingest] Body parsed successfully')
-  } catch (parseError) {
-    console.error('[ingest] Error parsing body:', parseError)
-    return NextResponse.json(
-      { success: false, error: 'Invalid JSON body' },
-      { status: 400 }
-    )
-  }
+    // Parse body
+    let body
+    try {
+      body = await request.json()
+      console.log('[ingest] Body parsed successfully')
+    } catch (parseError) {
+      console.error('[ingest] Error parsing body:', parseError)
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON body' },
+        { status: 400 }
+      )
+    }
 
-  const { files, userId, userEmail } = body
-  console.log(`[ingest] userId: ${userId}, files: ${files?.length || 0}`)
+    const { files, userId, userEmail } = body
+    console.log(`[ingest] userId: ${userId}, files: ${files?.length || 0}`)
 
     if (!files || !Array.isArray(files) || files.length === 0) {
       return NextResponse.json(
@@ -67,8 +65,7 @@ export async function POST(request: NextRequest) {
     // Crea client con service role (bypassa RLS)
     const supabase = createClient(config.supabaseUrl, config.supabaseKey)
 
-    // IMPORTANTE: Assicurati che l'utente esista PRIMA di inserire chunks
-    // Questo risolve il foreign key constraint
+    // Assicurati che l'utente esista PRIMA di inserire chunks
     console.log('[ingest] Checking if user exists...')
     const { data: existingUser } = await supabase
       .from('users')
@@ -78,14 +75,13 @@ export async function POST(request: NextRequest) {
 
     if (!existingUser) {
       console.log('[ingest] User not found, creating...')
-      // Crea l'utente se non esiste (usando service role, bypassa RLS)
       const { error: insertError } = await supabase
         .from('users')
         .insert({
           id: userId,
           email: userEmail || 'unknown@email.com',
           has_rag: false,
-          tier: 'beta', // Beta tester durante la fase di test
+          tier: 'beta',
         })
 
       if (insertError) {
@@ -100,8 +96,9 @@ export async function POST(request: NextRequest) {
       console.log('[ingest] User already exists')
     }
 
-    // Import dinamico del modulo RAG (per debug)
+    // Import dinamico del modulo RAG
     console.log('[ingest] Importing RAG module...')
+    let ingestUserChats
     try {
       const ragModule = await import('@llucy/rag')
       ingestUserChats = ragModule.ingestUserChats
@@ -139,7 +136,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Ingest error:', error)
+    console.error('[ingest] Unhandled error:', error)
     return NextResponse.json(
       { success: false, error: 'Errore durante il processing' },
       { status: 500 }
