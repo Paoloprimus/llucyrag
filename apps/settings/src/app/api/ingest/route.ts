@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestUserChats } from '@llucy/rag'
 import { createClient } from '@supabase/supabase-js'
+
+// Import dinamico per debug
+let ingestUserChats: typeof import('@llucy/rag').ingestUserChats
 
 // Test: verifica che la route sia raggiungibile
 export async function GET() {
@@ -8,11 +10,23 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[ingest] Richiesta ricevuta')
+  console.log('[ingest] POST ricevuto')
   
+  // Test semplice per verificare che POST funzioni
+  let body
   try {
-    const { files, userId, userEmail } = await request.json()
-    console.log(`[ingest] userId: ${userId}, files: ${files?.length || 0}`)
+    body = await request.json()
+    console.log('[ingest] Body parsed successfully')
+  } catch (parseError) {
+    console.error('[ingest] Error parsing body:', parseError)
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON body' },
+      { status: 400 }
+    )
+  }
+
+  const { files, userId, userEmail } = body
+  console.log(`[ingest] userId: ${userId}, files: ${files?.length || 0}`)
 
     if (!files || !Array.isArray(files) || files.length === 0) {
       return NextResponse.json(
@@ -84,6 +98,20 @@ export async function POST(request: NextRequest) {
       console.log('[ingest] User created successfully')
     } else {
       console.log('[ingest] User already exists')
+    }
+
+    // Import dinamico del modulo RAG (per debug)
+    console.log('[ingest] Importing RAG module...')
+    try {
+      const ragModule = await import('@llucy/rag')
+      ingestUserChats = ragModule.ingestUserChats
+      console.log('[ingest] RAG module imported successfully')
+    } catch (importError) {
+      console.error('[ingest] Failed to import RAG module:', importError)
+      return NextResponse.json(
+        { success: false, error: `RAG import failed: ${importError}` },
+        { status: 500 }
+      )
     }
 
     // Processa i file
