@@ -3,6 +3,15 @@
  * Supporta: ChatGPT (MD), Claude (JSON), Gemini (MD), Deepseek (MD)
  */
 
+// Genera UUID semplice (compatibile con tutti gli ambienti serverless)
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 export interface ParsedMessage {
   role: 'user' | 'assistant'
   content: string
@@ -78,7 +87,7 @@ function parseClaudeJSON(content: string): ParsedConversation[] {
 
     if (messages.length > 0) {
       conversations.push({
-        id: conv.uuid || conv.id || crypto.randomUUID(),
+        id: conv.uuid || conv.id || generateId(),
         title: conv.name || conv.title || 'Conversazione senza titolo',
         source: 'claude',
         messages,
@@ -161,7 +170,7 @@ function parseChatGPTMarkdown(content: string, filename: string): ParsedConversa
                 'Conversazione'
 
   return [{
-    id: crypto.randomUUID(),
+    id: generateId(),
     title,
     source: 'chatgpt',
     messages,

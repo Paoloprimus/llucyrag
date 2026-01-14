@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ingestUserChats } from '@llucy/rag'
 import { createClient } from '@supabase/supabase-js'
 
-// Aumenta il limite per file grandi (max 4.5MB su Vercel)
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '4mb',
-    },
-  },
-}
+// App Router non usa 'config' per body size - il limite è gestito da Vercel (4.5MB default)
 
 export async function POST(request: NextRequest) {
   console.log('[ingest] Richiesta ricevuta')
