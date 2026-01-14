@@ -103,17 +103,68 @@ export default function ChatPage() {
     )
   }
 
-  // Not logged in - show minimal prompt
+  // Login handler
+  const [email, setEmail] = useState('')
+  const [loginSent, setLoginSent] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError('')
+    
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: 'https://llucy.it/auth/callback',
+      },
+    })
+
+    if (error) {
+      setLoginError(error.message)
+    } else {
+      setLoginSent(true)
+    }
+  }
+
+  // Not logged in - show login form
   if (!user) {
     return (
       <main className="h-screen flex flex-col items-center justify-center px-4">
-        <p className="text-lg text-[var(--text-muted)] mb-6">Ciao. Sono llucy.</p>
+        <p className="text-lg text-[var(--text-muted)] mb-8">Ciao. Sono llucy.</p>
+        
+        {loginSent ? (
+          <p className="text-[var(--text-muted)]">Controlla la tua email per il link di accesso.</p>
+        ) : (
+          <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="la-tua@email.com"
+              className="w-full px-4 py-3 rounded-lg border border-[var(--border)] 
+                         bg-[var(--bg)] text-[var(--text)] placeholder:text-[var(--text-muted)]
+                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              required
+            />
+            {loginError && (
+              <p className="text-red-500 text-sm">{loginError}</p>
+            )}
+            <button
+              type="submit"
+              className="w-full px-6 py-3 bg-[var(--accent)] text-[var(--bg)] rounded-lg 
+                         text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Invia link magico
+            </button>
+          </form>
+        )}
+        
         <a
           href="https://settings.llucy.it"
-          className="px-6 py-3 bg-[var(--accent)] text-[var(--bg)] rounded-full 
-                     text-sm font-medium hover:opacity-90 transition-opacity"
+          className="mt-8 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
         >
-          Accedi per iniziare
+          Impostazioni e memoria
         </a>
       </main>
     )
