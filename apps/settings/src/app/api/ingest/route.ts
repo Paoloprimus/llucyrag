@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ingestUserChats } from '@llucy/rag'
 import { createClient } from '@supabase/supabase-js'
 
-// App Router non usa 'config' per body size - il limite è gestito da Vercel (4.5MB default)
+// Test: verifica che la route sia raggiungibile
+export async function GET() {
+  return NextResponse.json({ status: 'ok', method: 'GET' })
+}
 
 export async function POST(request: NextRequest) {
   console.log('[ingest] Richiesta ricevuta')
