@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ingestUserChats } from '@llucy/rag'
+import { createClient } from '@supabase/supabase-js'
 
 // Aumenta il limite per file grandi (max 4.5MB su Vercel)
 export const config = {
@@ -12,7 +13,7 @@ export const config = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { files, userId } = await request.json()
+    const { files, userId, userEmail } = await request.json()
 
     if (!files || !Array.isArray(files) || files.length === 0) {
       return NextResponse.json(
@@ -36,11 +37,49 @@ export async function POST(request: NextRequest) {
       cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN || '',
     }
 
+    if (!config.supabaseKey) {
+      return NextResponse.json(
+        { success: false, error: 'Configurazione Supabase mancante (service role key)' },
+        { status: 500 }
+      )
+    }
+
     if (!config.cloudflareAccountId || !config.cloudflareApiToken) {
       return NextResponse.json(
         { success: false, error: 'Configurazione Cloudflare mancante' },
         { status: 500 }
       )
+    }
+
+    // Crea client con service role (bypassa RLS)
+    const supabase = createClient(config.supabaseUrl, config.supabaseKey)
+
+    // IMPORTANTE: Assicurati che l'utente esista PRIMA di inserire chunks
+    // Questo risolve il foreign key constraint
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (!existingUser) {
+      // Crea l'utente se non esiste (usando service role, bypassa RLS)
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          email: userEmail || 'unknown@email.com',
+          has_rag: false,
+          tier: 'beta', // Beta tester durante la fase di test
+        })
+
+      if (insertError) {
+        console.error('Error creating user:', insertError)
+        return NextResponse.json(
+          { success: false, error: `Errore creazione utente: ${insertError.message}` },
+          { status: 500 }
+        )
+      }
     }
 
     // Processa i file
@@ -54,9 +93,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Aggiorna flag has_rag dell'utente
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(config.supabaseUrl, config.supabaseKey)
-    
     await supabase
       .from('users')
       .update({ has_rag: true })

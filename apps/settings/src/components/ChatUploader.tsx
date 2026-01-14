@@ -4,12 +4,13 @@ import { useState, useRef } from 'react'
 
 interface ChatUploaderProps {
   userId: string
+  userEmail: string
   onComplete: () => void
 }
 
 type UploadStatus = 'idle' | 'processing' | 'success' | 'error'
 
-export function ChatUploader({ userId, onComplete }: ChatUploaderProps) {
+export function ChatUploader({ userId, userEmail, onComplete }: ChatUploaderProps) {
   const [files, setFiles] = useState<File[]>([])
   const [status, setStatus] = useState<UploadStatus>('idle')
   const [progress, setProgress] = useState({ processed: 0, total: 0, chunks: 0 })
@@ -66,7 +67,8 @@ export function ChatUploader({ userId, onComplete }: ChatUploaderProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             files: [{ content, filename: file.name }], 
-            userId 
+            userId,
+            userEmail,
           }),
         })
 

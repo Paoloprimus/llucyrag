@@ -164,7 +164,8 @@ export function Dashboard({ user }: DashboardProps) {
           </div>
 
           <ChatUploader 
-            userId={user.id} 
+            userId={user.id}
+            userEmail={user.email || ''}
             onComplete={() => {
               setProfile(prev => prev ? { ...prev, has_rag: true } : null)
             }}
