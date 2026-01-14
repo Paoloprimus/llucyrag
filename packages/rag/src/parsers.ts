@@ -92,43 +92,67 @@ function parseClaudeJSON(content: string): ParsedConversation[] {
 
 /**
  * Parser per export ChatGPT (Markdown)
+ * Ottimizzato per file grandi
  */
 function parseChatGPTMarkdown(content: string, filename: string): ParsedConversation[] {
   const messages: ParsedMessage[] = []
   
-  // Pattern: **User:** o **Assistant:** o ## User / ## Assistant
+  // Regex compilate una volta sola (più veloce)
+  const userRegex = /^(?:\*\*User:\*\*|## User|User:)/i
+  const assistantRegex = /^(?:\*\*(?:Assistant|ChatGPT):\*\*|## (?:Assistant|ChatGPT)|(?:Assistant|ChatGPT):)/i
+  
   const lines = content.split('\n')
   let currentRole: 'user' | 'assistant' | null = null
   let currentContent: string[] = []
 
-  for (const line of lines) {
-    const userMatch = line.match(/^(?:\*\*User:\*\*|## User|User:)/i)
-    const assistantMatch = line.match(/^(?:\*\*(?:Assistant|ChatGPT):\*\*|## (?:Assistant|ChatGPT)|(?:Assistant|ChatGPT):)/i)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    
+    // Skip linee vuote all'inizio per performance
+    if (!currentRole && !line.trim()) continue
+    
+    // Test veloce prima di regex completo
+    const firstChar = line[0]
+    const isMarkerLine = firstChar === '*' || firstChar === '#' || 
+                         firstChar === 'U' || firstChar === 'A' || firstChar === 'C'
+    
+    if (isMarkerLine) {
+      const userMatch = userRegex.test(line)
+      const assistantMatch = !userMatch && assistantRegex.test(line)
 
-    if (userMatch || assistantMatch) {
-      // Salva messaggio precedente
-      if (currentRole && currentContent.length > 0) {
-        messages.push({
-          role: currentRole,
-          content: currentContent.join('\n').trim(),
-        })
+      if (userMatch || assistantMatch) {
+        // Salva messaggio precedente
+        if (currentRole && currentContent.length > 0) {
+          const content = currentContent.join('\n').trim()
+          if (content) {
+            messages.push({ role: currentRole, content })
+          }
+        }
+        
+        currentRole = userMatch ? 'user' : 'assistant'
+        // Rimuovi il marker dal contenuto
+        const colonIndex = line.indexOf(':')
+        currentContent = colonIndex > -1 ? [line.slice(colonIndex + 1).trim()] : []
+        continue
       }
-      
-      currentRole = userMatch ? 'user' : 'assistant'
-      // Rimuovi il marker dal contenuto
-      const markerEnd = line.indexOf(':') + 1
-      currentContent = [line.slice(markerEnd).trim()]
-    } else if (currentRole) {
+    }
+    
+    if (currentRole) {
       currentContent.push(line)
     }
   }
 
   // Salva ultimo messaggio
   if (currentRole && currentContent.length > 0) {
-    messages.push({
-      role: currentRole,
-      content: currentContent.join('\n').trim(),
-    })
+    const content = currentContent.join('\n').trim()
+    if (content) {
+      messages.push({ role: currentRole, content })
+    }
+  }
+
+  // Se nessun messaggio trovato, tratta tutto come singolo chunk
+  if (messages.length === 0 && content.trim()) {
+    messages.push({ role: 'user', content: content.trim() })
   }
 
   // Estrai titolo dal filename o primo messaggio
