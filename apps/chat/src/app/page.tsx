@@ -13,10 +13,14 @@ interface Message {
 }
 
 export default function ChatPage() {
+  // ALL hooks must be at the top, before any early returns
   const [user, setUser] = useState<User | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [loginSent, setLoginSent] = useState(false)
+  const [loginError, setLoginError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Check auth
@@ -37,13 +41,28 @@ export default function ChatPage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   useEffect(() => {
-    scrollToBottom()
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError('')
+    
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: 'https://llucy.it/auth/callback',
+      },
+    })
+
+    if (error) {
+      setLoginError(error.message)
+    } else {
+      setLoginSent(true)
+    }
+  }
 
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return
@@ -63,7 +82,7 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: content,
-          history: messages.slice(-10), // Ultimi 10 messaggi per contesto
+          history: messages.slice(-10),
           userId: user?.id,
         }),
       })
@@ -101,30 +120,6 @@ export default function ChatPage() {
         <p className="text-[var(--text-muted)]">...</p>
       </main>
     )
-  }
-
-  // Login handler
-  const [email, setEmail] = useState('')
-  const [loginSent, setLoginSent] = useState(false)
-  const [loginError, setLoginError] = useState('')
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError('')
-    
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: 'https://llucy.it/auth/callback',
-      },
-    })
-
-    if (error) {
-      setLoginError(error.message)
-    } else {
-      setLoginSent(true)
-    }
   }
 
   // Not logged in - show login form
