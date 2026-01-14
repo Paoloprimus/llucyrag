@@ -21,6 +21,9 @@ create table if not exists users (
 -- RLS
 alter table users enable row level security;
 
+create policy "Users can insert own data" on users
+  for insert with check (auth.uid() = id);
+
 create policy "Users can read own data" on users
   for select using (auth.uid() = id);
 

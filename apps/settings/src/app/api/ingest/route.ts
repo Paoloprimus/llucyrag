@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ingestUserChats } from '@llucy/rag'
 
+// Aumenta il limite per file grandi (max 4.5MB su Vercel)
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '4mb',
+    },
+  },
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { files, userId } = await request.json()

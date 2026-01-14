@@ -45,32 +45,49 @@ export function ChatUploader({ userId, onComplete }: ChatUploaderProps) {
     setError('')
 
     try {
-      // Leggi tutti i file
-      const fileContents: Array<{ content: string; filename: string }> = []
+      let totalChunks = 0
       
+      // Processa file uno alla volta per evitare payload troppo grandi
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const content = await file.text()
-        fileContents.push({ content, filename: file.name })
+        
         setProgress(prev => ({ ...prev, processed: i + 1 }))
+        
+        // Se il file è troppo grande (>2MB), skippa con warning
+        if (content.length > 2 * 1024 * 1024) {
+          console.warn(`File ${file.name} troppo grande, skipping...`)
+          continue
+        }
+
+        // Invia singolo file al backend
+        const response = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            files: [{ content, filename: file.name }], 
+            userId 
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          console.error(`Errore file ${file.name}:`, result.error)
+          continue // Continua con gli altri file
+        }
+
+        totalChunks += result.chunksCreated || 0
       }
 
-      // Invia al backend per processare
-      const response = await fetch('/api/ingest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files: fileContents, userId }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Errore durante il processing')
+      setProgress(prev => ({ ...prev, chunks: totalChunks }))
+      
+      if (totalChunks > 0) {
+        setStatus('success')
+        onComplete()
+      } else {
+        throw new Error('Nessun file processato correttamente')
       }
-
-      setProgress(prev => ({ ...prev, chunks: result.chunksCreated }))
-      setStatus('success')
-      onComplete()
 
     } catch (err) {
       setStatus('error')
