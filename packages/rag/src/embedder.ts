@@ -40,6 +40,8 @@ export async function generateEmbeddings(
 ): Promise<number[][]> {
   const { cloudflareAccountId, cloudflareApiToken } = config
 
+  console.log(`[Embedder] Generating embeddings for ${texts.length} texts...`)
+  
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/ai/run/@cf/baai/bge-small-en-v1.5`,
     {
@@ -53,18 +55,23 @@ export async function generateEmbeddings(
   )
 
   if (!response.ok) {
-    throw new Error(`Cloudflare AI error: ${response.statusText}`)
+    const errorText = await response.text()
+    console.error(`[Embedder] Cloudflare error: ${response.status} - ${errorText}`)
+    throw new Error(`Cloudflare AI error: ${response.status} ${response.statusText}`)
   }
 
   const data = await response.json() as { 
     success: boolean
     result: { data: number[][] }
+    errors?: Array<{ message: string }>
   }
   
   if (!data.success) {
-    throw new Error('Cloudflare AI returned unsuccessful response')
+    console.error('[Embedder] Cloudflare returned unsuccessful:', data.errors)
+    throw new Error(`Cloudflare AI error: ${data.errors?.[0]?.message || 'Unknown error'}`)
   }
 
+  console.log(`[Embedder] Successfully generated ${data.result.data.length} embeddings`)
   return data.result.data
 }
 

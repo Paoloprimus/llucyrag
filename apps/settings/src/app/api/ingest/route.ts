@@ -12,8 +12,11 @@ export const config = {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[ingest] Richiesta ricevuta')
+  
   try {
     const { files, userId, userEmail } = await request.json()
+    console.log(`[ingest] userId: ${userId}, files: ${files?.length || 0}`)
 
     if (!files || !Array.isArray(files) || files.length === 0) {
       return NextResponse.json(
@@ -56,6 +59,7 @@ export async function POST(request: NextRequest) {
 
     // IMPORTANTE: Assicurati che l'utente esista PRIMA di inserire chunks
     // Questo risolve il foreign key constraint
+    console.log('[ingest] Checking if user exists...')
     const { data: existingUser } = await supabase
       .from('users')
       .select('id')
@@ -63,6 +67,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!existingUser) {
+      console.log('[ingest] User not found, creating...')
       // Crea l'utente se non esiste (usando service role, bypassa RLS)
       const { error: insertError } = await supabase
         .from('users')
@@ -74,16 +79,21 @@ export async function POST(request: NextRequest) {
         })
 
       if (insertError) {
-        console.error('Error creating user:', insertError)
+        console.error('[ingest] Error creating user:', insertError)
         return NextResponse.json(
           { success: false, error: `Errore creazione utente: ${insertError.message}` },
           { status: 500 }
         )
       }
+      console.log('[ingest] User created successfully')
+    } else {
+      console.log('[ingest] User already exists')
     }
 
     // Processa i file
+    console.log('[ingest] Starting file processing...')
     const result = await ingestUserChats(files, userId, config)
+    console.log('[ingest] Processing result:', result)
 
     if (!result.success) {
       return NextResponse.json(

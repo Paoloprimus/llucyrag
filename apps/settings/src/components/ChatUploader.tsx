@@ -72,10 +72,22 @@ export function ChatUploader({ userId, userEmail, onComplete }: ChatUploaderProp
           }),
         })
 
-        const result = await response.json()
+        // Gestisci risposte vuote o errori di parsing
+        let result
+        try {
+          const text = await response.text()
+          if (!text) {
+            console.error(`Risposta vuota per ${file.name} (status: ${response.status})`)
+            continue
+          }
+          result = JSON.parse(text)
+        } catch (parseErr) {
+          console.error(`Errore parsing risposta per ${file.name}:`, parseErr)
+          continue
+        }
 
         if (!response.ok || !result.success) {
-          console.error(`Errore file ${file.name}:`, result.error)
+          console.error(`Errore file ${file.name}:`, result.error || response.statusText)
           continue // Continua con gli altri file
         }
 
