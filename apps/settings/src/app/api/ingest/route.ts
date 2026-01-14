@@ -165,6 +165,61 @@ export async function GET() {
   return NextResponse.json({ status: 'ok', method: 'GET' })
 }
 
+// DELETE: cancella chunks per source (es. 'claude')
+export async function DELETE(request: NextRequest) {
+  console.log('[ingest] DELETE received')
+  
+  try {
+    const { searchParams } = new URL(request.url)
+    const source = searchParams.get('source')
+    const userId = searchParams.get('userId')
+    
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: 'userId required' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    let query = supabase
+      .from('chat_chunks')
+      .delete()
+      .eq('user_id', userId)
+    
+    if (source) {
+      query = query.eq('source', source)
+    }
+
+    const { error, count } = await query.select('count')
+
+    if (error) {
+      console.error('[ingest] Delete error:', error)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      )
+    }
+
+    console.log(`[ingest] Deleted chunks for user ${userId}, source: ${source || 'all'}`)
+    return NextResponse.json({ 
+      success: true, 
+      message: `Deleted ${source || 'all'} chunks`,
+    })
+
+  } catch (error) {
+    console.error('[ingest] Delete error:', error)
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
   console.log('[ingest] POST received')
   
