@@ -63,7 +63,8 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: content,
-          history: messages.slice(-10) // Ultimi 10 messaggi per contesto
+          history: messages.slice(-10), // Ultimi 10 messaggi per contesto
+          userId: user?.id,
         }),
       })
 

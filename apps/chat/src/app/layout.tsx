@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: 'llucy',
   description: 'Il tuo assistente AI con memoria',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
