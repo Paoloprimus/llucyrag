@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
         .insert({
           id: userId,
           email: userEmail || 'unknown@email.com',
-          has_rag: false,
+          modules: { diario: false },
           tier: 'beta',
         })
 
@@ -341,10 +341,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update user has_rag
+    // Update user modules.diario
     await supabase
       .from('users')
-      .update({ has_rag: true })
+      .update({ modules: { diario: true } })
       .eq('id', userId)
 
     console.log('[ingest] Done!')

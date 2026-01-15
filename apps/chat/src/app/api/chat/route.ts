@@ -60,14 +60,16 @@ async function searchRAG(userId: string, query: string): Promise<string | null> 
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Check if user has RAG enabled
+    // Check if user has Diario module enabled
     const { data: user } = await supabase
       .from('users')
-      .select('has_rag')
+      .select('modules')
       .eq('id', userId)
       .single()
 
-    if (!user?.has_rag) {
+    // Check modules.diario (with fallback for old has_rag schema)
+    const diarioEnabled = user?.modules?.diario ?? false
+    if (!diarioEnabled) {
       return null
     }
 

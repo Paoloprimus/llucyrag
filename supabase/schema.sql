@@ -12,7 +12,7 @@ create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   email text unique not null,
   name text,
-  has_rag boolean default false,
+  modules jsonb default '{"diario": false}',
   tier text default 'free' check (tier in ('free', 'pro', 'beta')),
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
