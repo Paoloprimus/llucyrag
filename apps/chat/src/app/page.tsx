@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { ChatMessage } from '@/components/ChatMessage'
 import { ChatInput } from '@/components/ChatInput'
+import { Dashboard } from '@/components/Dashboard'
 import type { User } from '@supabase/supabase-js'
 
 interface Message {
@@ -12,6 +13,8 @@ interface Message {
   content: string
   timestamp?: number
 }
+
+type View = 'chat' | 'settings'
 
 const STORAGE_KEY = 'llucy-chat-messages'
 const THEME_KEY = 'llucy-theme'
@@ -25,6 +28,7 @@ export default function ChatPage() {
   const [loginSent, setLoginSent] = useState(false)
   const [loginError, setLoginError] = useState('')
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [view, setView] = useState<View>('chat')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef<string>(crypto.randomUUID())
 
@@ -127,7 +131,7 @@ export default function ChatPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: 'https://llucy.it/auth/callback',
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
 
@@ -245,17 +249,16 @@ export default function ChatPage() {
             </button>
           </form>
         )}
-        
-        <a
-          href="https://settings.llucy.it"
-          className="mt-8 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
-        >
-          Impostazioni e memoria
-        </a>
       </main>
     )
   }
 
+  // Show settings view
+  if (view === 'settings') {
+    return <Dashboard user={user} onBack={() => setView('chat')} />
+  }
+
+  // Show chat view
   return (
     <main className="h-screen flex flex-col">
       {/* Header */}
@@ -294,8 +297,8 @@ export default function ChatPage() {
         )}
 
         {/* Settings */}
-        <a
-          href="https://settings.llucy.it"
+        <button
+          onClick={() => setView('settings')}
           className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
           title="Impostazioni"
         >
@@ -305,7 +308,7 @@ export default function ChatPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-        </a>
+        </button>
       </div>
 
       {/* Messages */}
