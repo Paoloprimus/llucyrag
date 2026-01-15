@@ -18,15 +18,6 @@ interface UserProfile {
   tier: string
 }
 
-interface Goal {
-  id: string
-  title: string
-  description: string | null
-  why: string | null
-  status: string
-  created_at: string
-}
-
 interface DashboardProps {
   user: User
   onBack: () => void
@@ -37,19 +28,10 @@ export function Dashboard({ user, onBack }: DashboardProps) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'modules' | 'billing'>('profile')
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [newGoalTitle, setNewGoalTitle] = useState('')
-  const [addingGoal, setAddingGoal] = useState(false)
 
   useEffect(() => {
     loadProfile()
   }, [user.id])
-
-  useEffect(() => {
-    if (profile?.modules?.obiettivi) {
-      loadGoals()
-    }
-  }, [profile?.modules?.obiettivi])
 
   const loadProfile = async () => {
     const supabase = createClient()
@@ -78,16 +60,6 @@ export function Dashboard({ user, onBack }: DashboardProps) {
         modules: newProfile.modules,
       })
       setProfile(newProfile)
-    }
-  }
-
-  const loadGoals = async () => {
-    try {
-      const response = await fetch(`/api/goals?userId=${user.id}&status=active`)
-      const data = await response.json()
-      setGoals(data.goals || [])
-    } catch (e) {
-      console.error('Error loading goals:', e)
     }
   }
 
@@ -121,47 +93,6 @@ export function Dashboard({ user, onBack }: DashboardProps) {
       .eq('id', user.id)
 
     setProfile(prev => prev ? { ...prev, modules: newModules } : null)
-  }
-
-  const addGoal = async () => {
-    if (!newGoalTitle.trim()) return
-    
-    setAddingGoal(true)
-    try {
-      const response = await fetch('/api/goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          title: newGoalTitle.trim(),
-        }),
-      })
-      
-      if (response.ok) {
-        setNewGoalTitle('')
-        loadGoals()
-      }
-    } catch (e) {
-      console.error('Error adding goal:', e)
-    }
-    setAddingGoal(false)
-  }
-
-  const updateGoalStatus = async (goalId: string, status: string) => {
-    try {
-      await fetch('/api/goals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          goalId,
-          status,
-        }),
-      })
-      loadGoals()
-    } catch (e) {
-      console.error('Error updating goal:', e)
-    }
   }
 
   const handleLogout = async () => {
@@ -317,77 +248,9 @@ export function Dashboard({ user, onBack }: DashboardProps) {
             </div>
             
             {profile?.modules?.obiettivi ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-green-600">
-                  <span>✓</span>
-                  <span className="text-sm">Modulo attivo</span>
-                </div>
-                
-                <div className="pt-4 border-t border-[var(--border)]">
-                  <h3 className="text-sm font-medium mb-3">I tuoi obiettivi</h3>
-                  
-                  {/* Goals list */}
-                  {goals.length > 0 ? (
-                    <div className="space-y-2 mb-4">
-                      {goals.map(goal => (
-                        <div 
-                          key={goal.id}
-                          className="flex items-center justify-between p-3 bg-[var(--bg)] rounded-lg"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{goal.title}</p>
-                            <p className="text-xs text-[var(--text-muted)]">
-                              {goal.status === 'exploring' ? 'In esplorazione' : 'Attivo'}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            {goal.status === 'exploring' && (
-                              <button
-                                onClick={() => updateGoalStatus(goal.id, 'active')}
-                                className="text-xs text-[var(--accent)] hover:underline"
-                              >
-                                Attiva
-                              </button>
-                            )}
-                            <button
-                              onClick={() => updateGoalStatus(goal.id, 'achieved')}
-                              className="text-xs text-green-600 hover:underline"
-                            >
-                              Raggiunto
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[var(--text-muted)] mb-4">
-                      Nessun obiettivo ancora. Parlane con llucy o aggiungine uno qui.
-                    </p>
-                  )}
-                  
-                  {/* Add goal */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newGoalTitle}
-                      onChange={(e) => setNewGoalTitle(e.target.value)}
-                      placeholder="Nuovo obiettivo..."
-                      className="input flex-1 text-sm"
-                      onKeyDown={(e) => e.key === 'Enter' && addGoal()}
-                    />
-                    <button
-                      onClick={addGoal}
-                      disabled={addingGoal || !newGoalTitle.trim()}
-                      className="btn btn-secondary text-sm"
-                    >
-                      {addingGoal ? '...' : '+'}
-                    </button>
-                  </div>
-                  
-                  <p className="text-xs text-[var(--text-muted)] mt-3">
-                    Tip: parla con llucy dei tuoi obiettivi per esplorarli insieme
-                  </p>
-                </div>
+              <div className="flex items-center gap-2 text-green-600">
+                <span>✓</span>
+                <span className="text-sm">Modulo attivo - parlane con llucy</span>
               </div>
             ) : (
               <p className="text-sm text-[var(--text-muted)]">
