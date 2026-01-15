@@ -28,20 +28,43 @@ Non ostentare mai ciò che sai. Non offrire aiuto non richiesto.
 A volte la risposta migliore è breve, o è una domanda, o è silenzio.
 Sei un'amica molto in gamba, non un supereroe.`
 
-// Prompt per modulo Obiettivi
+// Prompt per modulo Obiettivi - Metodo Socratico
 const GOALS_PROMPT = `
 
-Hai accesso agli obiettivi dell'utente. Il tuo ruolo NON è fare da task manager,
-ma aiutare a chiarire cosa vuole veramente e perché.
+## Modalità Coaching (Metodo Socratico)
 
-Quando parli di obiettivi:
-- Aiuta a esplorare il "perché" dietro un desiderio
-- Fai domande che aprono riflessioni, non che chiudono
-- Collega naturalmente se qualcosa nel RAG è rilevante (persone, esperienze passate)
-- Non imporre timeline o step intermedi (a meno che l'utente non li chieda esplicitamente)
-- Celebra la chiarezza, non la produttività
+Quando l'utente parla di desideri, obiettivi o direzioni di vita, adotta il metodo socratico:
 
-Obiettivi attuali:`
+### Principi fondamentali:
+1. **Mai dare risposte o consigli** - Solo domande
+2. **Esplora le assunzioni** - "Cosa ti fa pensare che...?", "E se fosse diverso?"
+3. **Fai emergere, non imporre** - L'insight deve venire dall'utente
+4. **Una domanda alla volta** - Non sovraccaricare, lascia spazio
+5. **Accogli le contraddizioni** - Sono materiale prezioso, non errori
+
+### Domande socratiche utili:
+- "Cosa intendi esattamente con...?"
+- "Cosa ti attira di questo?"
+- "Come sapresti di averlo raggiunto?"
+- "Cosa cambierebbe nella tua vita?"
+- "C'è qualcosa che ti frena? Cosa?"
+- "Hai già provato qualcosa di simile?"
+- "Cosa succederebbe se non lo facessi?"
+
+### Cosa NON fare:
+- Non suggerire soluzioni
+- Non fare liste di step
+- Non proporre timeline
+- Non giudicare ("ottima idea!" è un giudizio)
+- Non riempire i silenzi - a volte servono
+
+### Integrazione con memoria:
+Se nel RAG trovi connessioni rilevanti (esperienze passate, persone, pattern), 
+usale per formulare domande, non per dare risposte.
+Es: "Mi sembra che tu abbia già parlato di qualcosa di simile tempo fa. Cosa è cambiato?"
+
+Non c'è una lista formale di obiettivi. I desideri e le direzioni emergono dalle conversazioni
+e tu li ritrovi nel contesto RAG quando sono rilevanti.`
 
 // Prompt aggiuntivo quando RAG trova contesto
 const RAG_CONTEXT_PROMPT = `
@@ -79,15 +102,6 @@ interface MoodSummary {
   entry_count: number
 }
 
-interface Goal {
-  id: string
-  title: string
-  description: string | null
-  why: string | null
-  status: string
-  related_topics: string[] | null
-  related_people: string[] | null
-}
 
 // Costruisce il contesto temporale (CORE - sempre presente)
 function buildContextPrompt(user: UserData | null, moodContext?: string): string {
@@ -318,46 +332,6 @@ function buildMoodContext(summary: MoodSummary | null, currentMood: MoodLevel | 
   return context
 }
 
-// Ottieni goals attivi
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getActiveGoals(userId: string, supabase: any): Promise<Goal[]> {
-  try {
-    const { data, error } = await supabase
-      .from('goals')
-      .select('id, title, description, why, status, related_topics, related_people')
-      .eq('user_id', userId)
-      .in('status', ['exploring', 'active'])
-      .order('created_at', { ascending: false })
-      .limit(10)
-    
-    if (error) {
-      console.error('[Goals] Fetch error:', error)
-      return []
-    }
-    
-    return data || []
-  } catch (e) {
-    console.error('[Goals] Error:', e)
-    return []
-  }
-}
-
-// Costruisce contesto goals per il prompt
-function buildGoalsContext(goals: Goal[]): string {
-  if (goals.length === 0) {
-    return '\nNessun obiettivo definito ancora.'
-  }
-  
-  return goals.map(g => {
-    let goalText = `\n- "${g.title}"`
-    if (g.status === 'exploring') goalText += ' (in esplorazione)'
-    if (g.why) goalText += `\n  Perché: ${g.why}`
-    if (g.related_people && g.related_people.length > 0) {
-      goalText += `\n  Persone collegate: ${g.related_people.join(', ')}`
-    }
-    return goalText
-  }).join('')
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -437,12 +411,9 @@ export async function POST(request: NextRequest) {
     // Aggiungi contesto temporale e mood (CORE - sempre)
     systemPrompt += buildContextPrompt(userData, moodContext)
 
-    // Aggiungi contesto obiettivi se modulo attivo
-    if (userId && userData?.modules?.obiettivi) {
-      const activeGoals = await getActiveGoals(userId, supabase)
-      if (activeGoals.length > 0) {
-        systemPrompt += GOALS_PROMPT + buildGoalsContext(activeGoals)
-      }
+    // Aggiungi metodo socratico se modulo Obiettivi attivo
+    if (userData?.modules?.obiettivi) {
+      systemPrompt += GOALS_PROMPT
     }
 
     // Search RAG if Diario is enabled
