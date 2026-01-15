@@ -110,6 +110,17 @@ async function generateQueryEmbedding(text: string): Promise<number[]> {
   return data.result.data[0]
 }
 
+// Tipo per i chunk RAG
+interface RAGChunk {
+  id: string
+  content: string
+  source: string
+  title: string
+  conversation_id: string
+  created_at?: string
+  similarity: number
+}
+
 // Search RAG with optional temporal filter
 async function searchRAG(
   userId: string, 
@@ -121,55 +132,54 @@ async function searchRAG(
     // Generate embedding for query
     const embedding = await generateQueryEmbedding(query)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let chunks: any[] | null = null
+    let chunks: RAGChunk[] = []
 
     if (temporalRange) {
       // Ricerca con filtro temporale
       console.log(`[RAG] Searching with temporal filter: ${temporalRange.description}`)
       
-      const { data, error } = await supabase.rpc('match_chunks_in_range' as any, {
+      const { data, error } = await (supabase.rpc as Function)('match_chunks_in_range', {
         query_embedding: embedding,
         match_count: 5,
         filter_user_id: userId,
         date_from: temporalRange.from.toISOString(),
         date_to: temporalRange.to.toISOString(),
-      } as any)
+      })
 
       if (error) {
         console.error('[RAG] Temporal search error:', error)
         // Fallback a ricerca normale
-        const { data: fallbackData } = await supabase.rpc('match_chunks' as any, {
+        const { data: fallbackData } = await (supabase.rpc as Function)('match_chunks', {
           query_embedding: embedding,
           match_count: 3,
           filter_user_id: userId,
-        } as any)
-        chunks = fallbackData
+        })
+        chunks = (fallbackData as RAGChunk[]) || []
       } else {
-        chunks = data
+        chunks = (data as RAGChunk[]) || []
       }
     } else {
       // Ricerca semantica normale
-      const { data, error } = await supabase.rpc('match_chunks' as any, {
+      const { data, error } = await (supabase.rpc as Function)('match_chunks', {
         query_embedding: embedding,
         match_count: 3,
         filter_user_id: userId,
-      } as any)
+      })
 
       if (error) {
         console.error('[RAG] Search error:', error)
         return null
       }
-      chunks = data
+      chunks = (data as RAGChunk[]) || []
     }
 
-    if (!chunks || chunks.length === 0) {
+    if (chunks.length === 0) {
       return null
     }
 
     // Format context from chunks
     const context = chunks
-      .map((c: { title: string; content: string; similarity: number; created_at?: string }) => {
+      .map((c) => {
         // Includi la data se disponibile e rilevante
         const dateInfo = c.created_at 
           ? ` (${new Date(c.created_at).toLocaleDateString('it-IT')})`
