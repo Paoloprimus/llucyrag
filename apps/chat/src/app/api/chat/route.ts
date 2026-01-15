@@ -127,33 +127,33 @@ async function searchRAG(
       // Ricerca con filtro temporale
       console.log(`[RAG] Searching with temporal filter: ${temporalRange.description}`)
       
-      const { data, error } = await supabase.rpc('match_chunks_in_range', {
+      const { data, error } = await supabase.rpc('match_chunks_in_range' as any, {
         query_embedding: embedding,
         match_count: 5,
         filter_user_id: userId,
         date_from: temporalRange.from.toISOString(),
         date_to: temporalRange.to.toISOString(),
-      })
+      } as any)
 
       if (error) {
         console.error('[RAG] Temporal search error:', error)
         // Fallback a ricerca normale
-        const { data: fallbackData } = await supabase.rpc('match_chunks', {
+        const { data: fallbackData } = await supabase.rpc('match_chunks' as any, {
           query_embedding: embedding,
           match_count: 3,
           filter_user_id: userId,
-        })
+        } as any)
         chunks = fallbackData
       } else {
         chunks = data
       }
     } else {
       // Ricerca semantica normale
-      const { data, error } = await supabase.rpc('match_chunks', {
+      const { data, error } = await supabase.rpc('match_chunks' as any, {
         query_embedding: embedding,
         match_count: 3,
         filter_user_id: userId,
-      })
+      } as any)
 
       if (error) {
         console.error('[RAG] Search error:', error)
