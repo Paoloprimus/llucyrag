@@ -28,6 +28,21 @@ Non ostentare mai ciò che sai. Non offrire aiuto non richiesto.
 A volte la risposta migliore è breve, o è una domanda, o è silenzio.
 Sei un'amica molto in gamba, non un supereroe.`
 
+// Prompt per modulo Obiettivi
+const GOALS_PROMPT = `
+
+Hai accesso agli obiettivi dell'utente. Il tuo ruolo NON è fare da task manager,
+ma aiutare a chiarire cosa vuole veramente e perché.
+
+Quando parli di obiettivi:
+- Aiuta a esplorare il "perché" dietro un desiderio
+- Fai domande che aprono riflessioni, non che chiudono
+- Collega naturalmente se qualcosa nel RAG è rilevante (persone, esperienze passate)
+- Non imporre timeline o step intermedi (a meno che l'utente non li chieda esplicitamente)
+- Celebra la chiarezza, non la produttività
+
+Obiettivi attuali:`
+
 // Prompt aggiuntivo quando RAG trova contesto
 const RAG_CONTEXT_PROMPT = `
 
@@ -62,6 +77,16 @@ interface MoodSummary {
   mood_trend: string
   dominant_mood: MoodLevel
   entry_count: number
+}
+
+interface Goal {
+  id: string
+  title: string
+  description: string | null
+  why: string | null
+  status: string
+  related_topics: string[] | null
+  related_people: string[] | null
 }
 
 // Costruisce il contesto temporale (CORE - sempre presente)
@@ -293,6 +318,47 @@ function buildMoodContext(summary: MoodSummary | null, currentMood: MoodLevel | 
   return context
 }
 
+// Ottieni goals attivi
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getActiveGoals(userId: string, supabase: any): Promise<Goal[]> {
+  try {
+    const { data, error } = await supabase
+      .from('goals')
+      .select('id, title, description, why, status, related_topics, related_people')
+      .eq('user_id', userId)
+      .in('status', ['exploring', 'active'])
+      .order('created_at', { ascending: false })
+      .limit(10)
+    
+    if (error) {
+      console.error('[Goals] Fetch error:', error)
+      return []
+    }
+    
+    return data || []
+  } catch (e) {
+    console.error('[Goals] Error:', e)
+    return []
+  }
+}
+
+// Costruisce contesto goals per il prompt
+function buildGoalsContext(goals: Goal[]): string {
+  if (goals.length === 0) {
+    return '\nNessun obiettivo definito ancora.'
+  }
+  
+  return goals.map(g => {
+    let goalText = `\n- "${g.title}"`
+    if (g.status === 'exploring') goalText += ' (in esplorazione)'
+    if (g.why) goalText += `\n  Perché: ${g.why}`
+    if (g.related_people && g.related_people.length > 0) {
+      goalText += `\n  Persone collegate: ${g.related_people.join(', ')}`
+    }
+    return goalText
+  }).join('')
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { message, history = [], userId, sessionId } = await request.json()
@@ -370,6 +436,14 @@ export async function POST(request: NextRequest) {
     
     // Aggiungi contesto temporale e mood (CORE - sempre)
     systemPrompt += buildContextPrompt(userData, moodContext)
+
+    // Aggiungi contesto obiettivi se modulo attivo
+    if (userId && userData?.modules?.obiettivi) {
+      const activeGoals = await getActiveGoals(userId, supabase)
+      if (activeGoals.length > 0) {
+        systemPrompt += GOALS_PROMPT + buildGoalsContext(activeGoals)
+      }
+    }
 
     // Search RAG if Diario is enabled
     if (userId && userData?.modules?.diario) {

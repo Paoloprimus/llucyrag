@@ -6,7 +6,8 @@ import { ChatUploader } from './ChatUploader'
 import type { User } from '@supabase/supabase-js'
 
 interface Modules {
-  diario: boolean
+  diario?: boolean
+  obiettivi?: boolean
 }
 
 interface UserProfile {
@@ -15,6 +16,15 @@ interface UserProfile {
   name: string | null
   modules: Modules
   tier: string
+}
+
+interface Goal {
+  id: string
+  title: string
+  description: string | null
+  why: string | null
+  status: string
+  created_at: string
 }
 
 interface DashboardProps {
@@ -27,10 +37,19 @@ export function Dashboard({ user, onBack }: DashboardProps) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'modules' | 'billing'>('profile')
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [newGoalTitle, setNewGoalTitle] = useState('')
+  const [addingGoal, setAddingGoal] = useState(false)
 
   useEffect(() => {
     loadProfile()
   }, [user.id])
+
+  useEffect(() => {
+    if (profile?.modules?.obiettivi) {
+      loadGoals()
+    }
+  }, [profile?.modules?.obiettivi])
 
   const loadProfile = async () => {
     const supabase = createClient()
@@ -42,7 +61,6 @@ export function Dashboard({ user, onBack }: DashboardProps) {
       .single()
 
     if (data) {
-      // Handle both old (has_rag) and new (modules) schema
       const modules = data.modules || { diario: data.has_rag || false }
       setProfile({ ...data, modules })
       setName(data.name || '')
@@ -51,7 +69,7 @@ export function Dashboard({ user, onBack }: DashboardProps) {
         id: user.id,
         email: user.email || '',
         name: null,
-        modules: { diario: false },
+        modules: { diario: false, obiettivi: false },
         tier: 'beta',
       }
       
@@ -60,6 +78,16 @@ export function Dashboard({ user, onBack }: DashboardProps) {
         modules: newProfile.modules,
       })
       setProfile(newProfile)
+    }
+  }
+
+  const loadGoals = async () => {
+    try {
+      const response = await fetch(`/api/goals?userId=${user.id}&status=active`)
+      const data = await response.json()
+      setGoals(data.goals || [])
+    } catch (e) {
+      console.error('Error loading goals:', e)
     }
   }
 
@@ -93,6 +121,47 @@ export function Dashboard({ user, onBack }: DashboardProps) {
       .eq('id', user.id)
 
     setProfile(prev => prev ? { ...prev, modules: newModules } : null)
+  }
+
+  const addGoal = async () => {
+    if (!newGoalTitle.trim()) return
+    
+    setAddingGoal(true)
+    try {
+      const response = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          title: newGoalTitle.trim(),
+        }),
+      })
+      
+      if (response.ok) {
+        setNewGoalTitle('')
+        loadGoals()
+      }
+    } catch (e) {
+      console.error('Error adding goal:', e)
+    }
+    setAddingGoal(false)
+  }
+
+  const updateGoalStatus = async (goalId: string, status: string) => {
+    try {
+      await fetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          goalId,
+          status,
+        }),
+      })
+      loadGoals()
+    } catch (e) {
+      console.error('Error updating goal:', e)
+    }
   }
 
   const handleLogout = async () => {
@@ -177,26 +246,26 @@ export function Dashboard({ user, onBack }: DashboardProps) {
               <div>
                 <h2 className="font-medium">Diario</h2>
                 <p className="text-sm text-[var(--text-muted)]">
-                  Memoria delle tue conversazioni passate con altri AI
+                  Memoria delle tue conversazioni
                 </p>
               </div>
               <button
                 onClick={() => toggleModule('diario')}
                 className={`relative w-12 h-6 rounded-full transition-colors ${
-                  profile?.modules.diario 
+                  profile?.modules?.diario 
                     ? 'bg-[var(--accent)]' 
                     : 'bg-[var(--border)]'
                 }`}
               >
                 <span
                   className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                    profile?.modules.diario ? 'left-7' : 'left-1'
+                    profile?.modules?.diario ? 'left-7' : 'left-1'
                   }`}
                 />
               </button>
             </div>
             
-            {profile?.modules.diario ? (
+            {profile?.modules?.diario ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-green-600">
                   <span>✓</span>
@@ -217,7 +286,112 @@ export function Dashboard({ user, onBack }: DashboardProps) {
               </div>
             ) : (
               <p className="text-sm text-[var(--text-muted)]">
-                Attiva questo modulo per dare a llucy accesso alle tue conversazioni passate.
+                Attiva per dare a llucy accesso alle tue conversazioni passate.
+              </p>
+            )}
+          </div>
+
+          {/* Obiettivi Module */}
+          <div className="card">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="font-medium">Obiettivi</h2>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Chiarisci cosa vuoi e perché
+                </p>
+              </div>
+              <button
+                onClick={() => toggleModule('obiettivi')}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  profile?.modules?.obiettivi 
+                    ? 'bg-[var(--accent)]' 
+                    : 'bg-[var(--border)]'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                    profile?.modules?.obiettivi ? 'left-7' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {profile?.modules?.obiettivi ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-600">
+                  <span>✓</span>
+                  <span className="text-sm">Modulo attivo</span>
+                </div>
+                
+                <div className="pt-4 border-t border-[var(--border)]">
+                  <h3 className="text-sm font-medium mb-3">I tuoi obiettivi</h3>
+                  
+                  {/* Goals list */}
+                  {goals.length > 0 ? (
+                    <div className="space-y-2 mb-4">
+                      {goals.map(goal => (
+                        <div 
+                          key={goal.id}
+                          className="flex items-center justify-between p-3 bg-[var(--bg)] rounded-lg"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{goal.title}</p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {goal.status === 'exploring' ? 'In esplorazione' : 'Attivo'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            {goal.status === 'exploring' && (
+                              <button
+                                onClick={() => updateGoalStatus(goal.id, 'active')}
+                                className="text-xs text-[var(--accent)] hover:underline"
+                              >
+                                Attiva
+                              </button>
+                            )}
+                            <button
+                              onClick={() => updateGoalStatus(goal.id, 'achieved')}
+                              className="text-xs text-green-600 hover:underline"
+                            >
+                              Raggiunto
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--text-muted)] mb-4">
+                      Nessun obiettivo ancora. Parlane con llucy o aggiungine uno qui.
+                    </p>
+                  )}
+                  
+                  {/* Add goal */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newGoalTitle}
+                      onChange={(e) => setNewGoalTitle(e.target.value)}
+                      placeholder="Nuovo obiettivo..."
+                      className="input flex-1 text-sm"
+                      onKeyDown={(e) => e.key === 'Enter' && addGoal()}
+                    />
+                    <button
+                      onClick={addGoal}
+                      disabled={addingGoal || !newGoalTitle.trim()}
+                      className="btn btn-secondary text-sm"
+                    >
+                      {addingGoal ? '...' : '+'}
+                    </button>
+                  </div>
+                  
+                  <p className="text-xs text-[var(--text-muted)] mt-3">
+                    Tip: parla con llucy dei tuoi obiettivi per esplorarli insieme
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">
+                Attiva per esplorare i tuoi obiettivi con llucy.
               </p>
             )}
           </div>
@@ -226,23 +400,9 @@ export function Dashboard({ user, onBack }: DashboardProps) {
           <div className="card opacity-50">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="font-medium">Obiettivi</h2>
-                <p className="text-sm text-[var(--text-muted)]">
-                  Traccia e rifletti sui tuoi obiettivi
-                </p>
-              </div>
-              <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] px-2 py-1 rounded">
-                Prossimamente
-              </span>
-            </div>
-          </div>
-
-          <div className="card opacity-50">
-            <div className="flex items-start justify-between">
-              <div>
                 <h2 className="font-medium">Agenda</h2>
                 <p className="text-sm text-[var(--text-muted)]">
-                  Organizza il tuo tempo con llucy
+                  Organizza il tuo tempo
                 </p>
               </div>
               <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] px-2 py-1 rounded">
