@@ -122,11 +122,12 @@ interface RAGChunk {
 }
 
 // Search RAG with optional temporal filter
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function searchRAG(
   userId: string, 
   query: string, 
   temporalRange: TemporalRange | null,
-  supabase: ReturnType<typeof createClient>
+  supabase: any
 ): Promise<string | null> {
   try {
     // Generate embedding for query
