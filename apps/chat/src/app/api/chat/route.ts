@@ -7,6 +7,11 @@ import {
   formatTimeIT,
   type TemporalRange 
 } from '@/lib/temporal-parser'
+import { 
+  detectMood, 
+  moodToDescription,
+  type MoodLevel 
+} from '@/lib/mood-detector'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -52,8 +57,15 @@ interface UserData {
   tier: string
 }
 
+interface MoodSummary {
+  avg_mood: number
+  mood_trend: string
+  dominant_mood: MoodLevel
+  entry_count: number
+}
+
 // Costruisce il contesto temporale (CORE - sempre presente)
-function buildContextPrompt(user: UserData | null): string {
+function buildContextPrompt(user: UserData | null, moodContext?: string): string {
   const now = new Date()
   const dateStr = formatDateIT(now)
   const timeStr = formatTimeIT(now)
@@ -79,6 +91,12 @@ Informazioni contestuali:
       context += `
 - Moduli attivi: ${activeModules.join(', ')}`
     }
+  }
+
+  // Mood context (se disponibile)
+  if (moodContext) {
+    context += `
+${moodContext}`
   }
 
   return context
@@ -197,9 +215,87 @@ async function searchRAG(
   }
 }
 
+// Salva mood entry nel database
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function saveMoodEntry(
+  userId: string,
+  mood: MoodLevel,
+  intensity: number,
+  keywords: string[],
+  sessionId: string | null,
+  supabase: any
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('mood_entries')
+      .insert({
+        user_id: userId,
+        mood,
+        intensity,
+        keywords,
+        session_id: sessionId,
+      })
+    
+    if (error) {
+      console.error('[Mood] Save error:', error)
+    } else {
+      console.log(`[Mood] Saved: ${mood} (${intensity.toFixed(2)})`)
+    }
+  } catch (e) {
+    console.error('[Mood] Save exception:', e)
+  }
+}
+
+// Ottieni sommario mood recente
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getMoodSummary(userId: string, supabase: any): Promise<MoodSummary | null> {
+  try {
+    const { data, error } = await (supabase.rpc as Function)('get_mood_summary', {
+      p_user_id: userId,
+      p_days: 7,
+    })
+    
+    if (error || !data || data.length === 0) {
+      return null
+    }
+    
+    return data[0] as MoodSummary
+  } catch (e) {
+    console.error('[Mood] Summary error:', e)
+    return null
+  }
+}
+
+// Costruisce contesto mood per il prompt
+function buildMoodContext(summary: MoodSummary | null, currentMood: MoodLevel | null): string {
+  if (!summary && !currentMood) {
+    return ''
+  }
+  
+  let context = '\n- Stato emotivo:'
+  
+  if (currentMood) {
+    context += ` in questo momento sembra ${moodToDescription(currentMood)}`
+  }
+  
+  if (summary && summary.entry_count >= 3) {
+    const trendText = summary.mood_trend === 'miglioramento' 
+      ? 'in miglioramento'
+      : summary.mood_trend === 'peggioramento'
+        ? 'in calo'
+        : 'stabile'
+    
+    context += currentMood 
+      ? `. Nell'ultima settimana umore ${trendText}`
+      : ` trend ultima settimana: ${trendText}`
+  }
+  
+  return context
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { message, history = [], userId } = await request.json()
+    const { message, history = [], userId, sessionId } = await request.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Messaggio mancante' }, { status: 400 })
@@ -233,6 +329,33 @@ export async function POST(request: NextRequest) {
       console.log(`[Temporal] Detected: "${temporalRange.description}"`)
     }
 
+    // Detect mood from user message (se Diario attivo)
+    let currentMood: MoodLevel | null = null
+    let moodContext = ''
+    
+    if (userId && userData?.modules?.diario) {
+      // Rileva mood dal messaggio corrente
+      const moodAnalysis = detectMood(message)
+      if (moodAnalysis && moodAnalysis.confidence >= 0.3) {
+        currentMood = moodAnalysis.mood
+        console.log(`[Mood] Detected: ${moodAnalysis.mood} (conf: ${moodAnalysis.confidence.toFixed(2)})`)
+        
+        // Salva mood entry (async, non blocca)
+        saveMoodEntry(
+          userId,
+          moodAnalysis.mood,
+          moodAnalysis.intensity,
+          moodAnalysis.keywords,
+          sessionId || null,
+          supabase
+        )
+      }
+      
+      // Ottieni sommario mood recente
+      const moodSummary = await getMoodSummary(userId, supabase)
+      moodContext = buildMoodContext(moodSummary, currentMood)
+    }
+
     // Build conversation
     const messages: { role: 'user' | 'assistant'; content: string }[] = [
       ...history.map((m: Message) => ({
@@ -245,8 +368,8 @@ export async function POST(request: NextRequest) {
     // Build system prompt
     let systemPrompt = BASE_PROMPT
     
-    // Aggiungi contesto temporale (CORE - sempre)
-    systemPrompt += buildContextPrompt(userData)
+    // Aggiungi contesto temporale e mood (CORE - sempre)
+    systemPrompt += buildContextPrompt(userData, moodContext)
 
     // Search RAG if Diario is enabled
     if (userId && userData?.modules?.diario) {

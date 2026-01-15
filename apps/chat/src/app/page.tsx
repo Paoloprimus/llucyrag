@@ -164,6 +164,7 @@ export default function ChatPage() {
           message: content,
           history: messages.slice(-10),
           userId: user?.id,
+          sessionId: sessionIdRef.current,
         }),
       })
 
