@@ -121,7 +121,8 @@ async function searchRAG(
     // Generate embedding for query
     const embedding = await generateQueryEmbedding(query)
 
-    let chunks
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let chunks: any[] | null = null
 
     if (temporalRange) {
       // Ricerca con filtro temporale
