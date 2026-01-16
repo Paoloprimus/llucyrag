@@ -1,12 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
+
+const REMEMBERED_EMAIL_KEY = 'llucy-remembered-email'
 
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isReturningUser, setIsReturningUser] = useState(false)
+
+  // Load remembered email on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY)
+    if (savedEmail) {
+      setEmail(savedEmail)
+      setIsReturningUser(true)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,15 +41,25 @@ export function LoginForm() {
       setStatus('error')
       setErrorMessage(error.message)
     } else {
+      // Remember email for next time
+      localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim())
       setStatus('sent')
     }
+  }
+
+  const handleChangeEmail = () => {
+    setEmail('')
+    setIsReturningUser(false)
+    localStorage.removeItem(REMEMBERED_EMAIL_KEY)
   }
 
   return (
     <div className="max-w-md mx-auto mt-20">
       <div className="text-center mb-8">
         <h1 className="text-2xl font-semibold mb-2">LLucy</h1>
-        <p className="text-[var(--text-muted)]">Accedi per gestire il tuo account</p>
+        <p className="text-[var(--text-muted)]">
+          {isReturningUser ? 'Bentornato!' : 'Accedi per gestire il tuo account'}
+        </p>
       </div>
 
       {status === 'sent' ? (
@@ -57,18 +79,38 @@ export function LoginForm() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="card">
-          <label className="block mb-2 text-sm font-medium">
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="la-tua@email.com"
-            className="input mb-4"
-            disabled={status === 'loading'}
-            autoFocus
-          />
+          {isReturningUser ? (
+            // Returning user - show email with option to change
+            <div className="mb-4">
+              <p className="text-sm text-[var(--text-muted)] mb-2">Accedi come:</p>
+              <div className="flex items-center justify-between p-3 bg-[var(--bg-secondary)] rounded-lg">
+                <span className="font-medium">{email}</span>
+                <button
+                  type="button"
+                  onClick={handleChangeEmail}
+                  className="text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+                >
+                  Cambia
+                </button>
+              </div>
+            </div>
+          ) : (
+            // New user - show email input
+            <>
+              <label className="block mb-2 text-sm font-medium">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="la-tua@email.com"
+                className="input mb-4"
+                disabled={status === 'loading'}
+                autoFocus
+              />
+            </>
+          )}
 
           {status === 'error' && (
             <p className="text-sm text-[var(--error)] mb-4">

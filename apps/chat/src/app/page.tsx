@@ -18,6 +18,7 @@ type View = 'chat' | 'settings'
 
 const STORAGE_KEY = 'llucy-chat-messages'
 const THEME_KEY = 'llucy-theme'
+const REMEMBERED_EMAIL_KEY = 'llucy-remembered-email'
 
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -27,6 +28,7 @@ export default function ChatPage() {
   const [email, setEmail] = useState('')
   const [loginSent, setLoginSent] = useState(false)
   const [loginError, setLoginError] = useState('')
+  const [isReturningUser, setIsReturningUser] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [view, setView] = useState<View>('chat')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -41,6 +43,15 @@ export default function ChatPage() {
     } else {
       // Default to dark
       applyTheme('dark')
+    }
+  }, [])
+
+  // Load remembered email
+  useEffect(() => {
+    const savedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY)
+    if (savedEmail) {
+      setEmail(savedEmail)
+      setIsReturningUser(true)
     }
   }, [])
 
@@ -138,8 +149,16 @@ export default function ChatPage() {
     if (error) {
       setLoginError(error.message)
     } else {
+      // Remember email for next time
+      localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim())
       setLoginSent(true)
     }
+  }
+
+  const handleChangeEmail = () => {
+    setEmail('')
+    setIsReturningUser(false)
+    localStorage.removeItem(REMEMBERED_EMAIL_KEY)
   }
 
   const sendMessage = async (content: string) => {
@@ -222,22 +241,47 @@ export default function ChatPage() {
   if (!user) {
     return (
       <main className="h-screen flex flex-col items-center justify-center px-4">
-        <p className="text-lg text-[var(--text-muted)] mb-8">Ciao. Sono llucy.</p>
+        <p className="text-lg text-[var(--text-muted)] mb-8">
+          {isReturningUser ? 'Bentornato.' : 'Ciao. Sono llucy.'}
+        </p>
         
         {loginSent ? (
-          <p className="text-[var(--text-muted)]">Controlla la tua email per il link di accesso.</p>
+          <div className="text-center">
+            <p className="text-[var(--text-muted)] mb-4">Controlla la tua email per il link di accesso.</p>
+            <button
+              onClick={() => setLoginSent(false)}
+              className="text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+            >
+              Usa un&apos;altra email
+            </button>
+          </div>
         ) : (
           <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="la-tua@email.com"
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border)] 
-                         bg-[var(--bg)] text-[var(--text)] placeholder:text-[var(--text-muted)]
-                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              required
-            />
+            {isReturningUser ? (
+              // Returning user - show email with option to change
+              <div className="flex items-center justify-between p-3 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
+                <span className="text-[var(--text)]">{email}</span>
+                <button
+                  type="button"
+                  onClick={handleChangeEmail}
+                  className="text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+                >
+                  Cambia
+                </button>
+              </div>
+            ) : (
+              // New user - show email input
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="la-tua@email.com"
+                className="w-full px-4 py-3 rounded-lg border border-[var(--border)] 
+                           bg-[var(--bg)] text-[var(--text)] placeholder:text-[var(--text-muted)]
+                           focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                required
+              />
+            )}
             {loginError && (
               <p className="text-red-500 text-sm">{loginError}</p>
             )}
