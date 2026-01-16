@@ -99,7 +99,7 @@ export function Dashboard({ user }: DashboardProps) {
     await supabase.auth.signOut()
     // Clear shared cookie
     document.cookie = 'llucy-auth=; path=/; domain=.llucy.it; max-age=0'
-    window.location.href = '/'
+    window.location.href = 'https://llucy.it'
   }
 
   const tabs = [
